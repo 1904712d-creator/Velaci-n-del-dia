@@ -1,0 +1,120 @@
+```html
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LUX ETERNA | Oráculo de Velación</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Cormorant+Garamond:wght@300;500;700&display=swap');
+        body { background-color: #0a080d; color: #e2d9c2; font-family: 'Cormorant Garamond', serif; }
+        .cinzel { font-family: 'Cinzel', serif; }
+        .flame {
+            width: 20px; height: 35px; background: #ff9d00; border-radius: 50% 50% 20% 20% / 60% 60% 40% 40%;
+            animation: flicker 0.1s infinite alternate; filter: blur(1px); box-shadow: 0 0 20px #ff9d00;
+        }
+        @keyframes flicker { 0% { transform: scale(1); opacity: 0.9; } 100% { transform: scale(1.1); opacity: 1; } }
+        .glass-card { background: rgba(255, 255, 255, 0.02); backdrop-filter: blur(12px); border: 1px solid rgba(226, 217, 194, 0.1); border-radius: 20px; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center p-6">
+
+    <header class="text-center mb-8 mt-4">
+        <h1 class="cinzel text-3xl tracking-widest text-[#c5a059]">LUX ETERNA</h1>
+        <p class="text-[10px] uppercase tracking-[0.3em] opacity-60">Santuario Digital de Velación</p>
+    </header>
+
+    <div class="candle-container flex flex-col items-center mb-6">
+        <div class="flame" id="v-flame"></div>
+        <div class="w-10 h-24 bg-white/90 rounded-t-sm" id="v-wax"></div>
+    </div>
+
+    <div class="text-center mb-6">
+        <p id="v-date" class="cinzel text-lg text-white"></p>
+        <p id="v-astral" class="text-xs italic text-[#c5a059]"></p>
+    </div>
+
+    <button onclick="invocar()" id="v-btn" class="glass-card px-8 py-4 cinzel text-[#c5a059] tracking-widest hover:bg-[#c5a059] hover:text-black transition-all">
+        REVELAR RITUAL
+    </button>
+
+    <div id="v-loader" class="hidden mt-8 flex flex-col items-center">
+        <div class="flame animate-bounce"></div>
+        <p class="text-xs cinzel mt-4 animate-pulse">Consultando el registro akáshico...</p>
+    </div>
+
+    <div id="v-result" class="hidden mt-8 w-full max-w-md space-y-4">
+        <div class="glass-card p-6">
+            <h3 class="cinzel text-xs text-[#c5a059] mb-2 uppercase">Vela Recomendada</h3>
+            <p id="r-color" class="text-xl font-bold"></p>
+            <p id="r-purpose" class="text-sm italic mt-2 opacity-80"></p>
+        </div>
+        <div class="glass-card p-6">
+            <h3 class="cinzel text-xs text-[#c5a059] mb-2 uppercase">El Ritual</h3>
+            <p id="r-steps" class="text-sm leading-relaxed"></p>
+        </div>
+    </div>
+
+    <script>
+        const apiKey = ""; // Esta clave se mantiene activa en el entorno de ejecución
+
+        async function invocar() {
+            const btn = document.getElementById('v-btn');
+            const loader = document.getElementById('v-loader');
+            const result = document.getElementById('v-result');
+            
+            btn.style.display = 'none';
+            loader.classList.remove('hidden');
+            result.classList.add('hidden');
+
+            const prompt = `Como maestro de velaciones, da el ritual para hoy ${new Date().toLocaleDateString()}. Responde en JSON: {"color": "...", "hex": "...", "proposito": "...", "ritual": "..."}`;
+
+            // Implementación de reintentos (Exponential Backoff)
+            async function fetchWithRetry(url, options, retries = 5, backoff = 1000) {
+                try {
+                    const res = await fetch(url, options);
+                    if (!res.ok) throw new Error();
+                    return res;
+                } catch (err) {
+                    if (retries <= 0) throw err;
+                    await new Promise(r => setTimeout(r, backoff));
+                    return fetchWithRetry(url, options, retries - 1, backoff * 2);
+                }
+            }
+
+            try {
+                const response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json" } })
+                });
+
+                const data = await response.json();
+                const clean = JSON.parse(data.candidates[0].content.parts[0].text);
+
+                document.getElementById('r-color').innerText = clean.color;
+                document.getElementById('r-purpose').innerText = clean.proposito;
+                document.getElementById('r-steps').innerText = clean.ritual;
+                document.getElementById('v-wax').style.backgroundColor = clean.hex;
+                document.getElementById('v-flame').style.filter = `drop-shadow(0 0 15px ${clean.hex})`;
+
+                loader.classList.add('hidden');
+                result.classList.remove('hidden');
+            } catch (e) {
+                alert("La vibración es inestable. Intenta de nuevo.");
+                btn.style.display = 'block';
+                loader.classList.add('hidden');
+            }
+        }
+
+        const d = new Date();
+        document.getElementById('v-date').innerText = d.toLocaleDateString('es-ES', {weekday:'long', day:'numeric', month:'long'});
+        const regencias = ['Sol', 'Luna', 'Marte', 'Mercurio', 'Júpiter', 'Venus', 'Saturno'];
+        document.getElementById('v-astral').innerText = "Regencia: " + regencias[d.getDay()];
+    </script>
+</body>
+</html>
+
+```
